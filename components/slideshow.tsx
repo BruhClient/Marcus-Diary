@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 type SlideImage = {
@@ -48,8 +49,8 @@ export function Slideshow({ images }: SlideshowProps) {
       {/* Bottom text */}
       <div className="absolute bottom-16 left-1/2 flex -translate-x-1/2 flex-col items-center gap-4 text-white">
         <h1 className="text-4xl whitespace-nowrap">Goh Wei Yu Marcus</h1>
-        <Button variant="striking" size="xl">
-          View Gallery
+        <Button variant="striking" size="xl" asChild>
+          <Link href="/gallery">View Gallery</Link>
         </Button>
       </div>
 
