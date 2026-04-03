@@ -9,10 +9,12 @@ async function getSlideshowImages() {
     `*[_type == "slideshow"][0]{ images[]{ asset, alt } }`
   );
   if (!data?.images) return [];
-  return data.images.map((img: { asset: { _ref: string }; alt?: string }) => ({
-    src: urlFor(img).width(1920).url(),
-    alt: img.alt ?? "Slideshow image",
-  }));
+  return data.images
+    .filter((img: { asset: { _ref: string } | null; alt?: string }) => img.asset?._ref)
+    .map((img: { asset: { _ref: string }; alt?: string }) => ({
+      src: urlFor(img).width(1920).url(),
+      alt: img.alt ?? "Slideshow image",
+    }));
 }
 
 export default async function Home() {
