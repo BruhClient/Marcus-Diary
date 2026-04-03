@@ -4,10 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/mode-toggle";
 import { AuthDialog } from "@/components/auth-dialog";
+import { useCart } from "@/components/cart-provider";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -20,6 +21,7 @@ const navLinks = [
 export function Navbar() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const { itemCount, setCartOpen } = useCart();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-sm">
@@ -49,6 +51,20 @@ export function Navbar() {
         <div className="ml-auto flex items-center gap-1">
           <AuthDialog />
           <ModeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCartOpen(true)}
+            aria-label="Open cart"
+            className="relative"
+          >
+            <ShoppingBag className="size-5" />
+            {itemCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex size-4 items-center justify-center rounded-full bg-foreground text-background text-[10px] font-bold">
+                {itemCount}
+              </span>
+            )}
+          </Button>
           {/* Hamburger */}
           <Button
             variant="ghost"
