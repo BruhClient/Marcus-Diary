@@ -6,21 +6,33 @@ async function shopifyFetch<T>(
   query: string,
   variables?: Record<string, unknown>
 ): Promise<T> {
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Shopify-Storefront-Access-Token": token,
-    },
-    body: JSON.stringify({ query, variables }),
-    cache: "no-store",
-  });
-  const json = await res.json();
-  if (json.errors) {
-    console.error("Shopify API errors:", json.errors);
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Shopify-Storefront-Access-Token": token,
+      },
+      body: JSON.stringify({ query, variables }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) {
+      console.error(`Shopify fetch failed: ${res.status} ${res.statusText}`);
+      return {} as T;
+    }
+
+    const json: { data?: T; errors?: unknown } = await res.json();
+    if (json.errors) {
+      console.error("Shopify API errors:", JSON.stringify(json.errors, null, 2));
+      return {} as T;
+    }
+
+    return (json.data ?? {}) as T;
+  } catch (err) {
+    console.error("Shopify fetch threw:", err);
     return {} as T;
   }
-  return json.data as T;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -138,7 +150,7 @@ export async function getProducts(): Promise<ShopifyProduct[]> {
 
 // ─── Cart ─────────────────────────────────────────────────────────────────────
 
-export async function createCart(): Promise<Cart> {
+export async function createCart(): Promise<Cart | null> {
   const data = await shopifyFetch<{ cartCreate: { cart: Cart } }>(`
     mutation CartCreate {
       cartCreate {
@@ -146,70 +158,60 @@ export async function createCart(): Promise<Cart> {
       }
     }
   `);
-  return data.cartCreate.cart;
+  return data.cartCreate?.cart ?? null;
 }
 
 export async function getCart(cartId: string): Promise<Cart | null> {
   const data = await shopifyFetch<{ cart: Cart | null }>(
-    `
-    query Cart($cartId: ID!) {
-      cart(id: $cartId) { ${CART_FRAGMENT} }
-    }
-  `,
+    `query Cart($cartId: ID!) { cart(id: $cartId) { ${CART_FRAGMENT} } }`,
     { cartId }
   );
-  return data.cart;
+  return data.cart ?? null;
 }
 
 export async function addToCart(
   cartId: string,
   variantId: string,
   quantity = 1
-): Promise<Cart> {
+): Promise<Cart | null> {
   const data = await shopifyFetch<{ cartLinesAdd: { cart: Cart } }>(
-    `
-    mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
+    `mutation CartLinesAdd($cartId: ID!, $lines: [CartLineInput!]!) {
       cartLinesAdd(cartId: $cartId, lines: $lines) {
         cart { ${CART_FRAGMENT} }
       }
-    }
-  `,
+    }`,
     { cartId, lines: [{ merchandiseId: variantId, quantity }] }
   );
-  return data.cartLinesAdd.cart;
+  return data.cartLinesAdd?.cart ?? null;
 }
 
 export async function removeFromCart(
   cartId: string,
   lineId: string
-): Promise<Cart> {
+): Promise<Cart | null> {
   const data = await shopifyFetch<{ cartLinesRemove: { cart: Cart } }>(
-    `
-    mutation CartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
+    `mutation CartLinesRemove($cartId: ID!, $lineIds: [ID!]!) {
       cartLinesRemove(cartId: $cartId, lineIds: $lineIds) {
         cart { ${CART_FRAGMENT} }
       }
-    }
-  `,
+    }`,
     { cartId, lineIds: [lineId] }
   );
-  return data.cartLinesRemove.cart;
+  return data.cartLinesRemove?.cart ?? null;
 }
 
 export async function updateCartLine(
   cartId: string,
   lineId: string,
   quantity: number
-): Promise<Cart> {
+): Promise<Cart | null> {
   const data = await shopifyFetch<{ cartLinesUpdate: { cart: Cart } }>(
-    `
-    mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
+    `mutation CartLinesUpdate($cartId: ID!, $lines: [CartLineUpdateInput!]!) {
       cartLinesUpdate(cartId: $cartId, lines: $lines) {
         cart { ${CART_FRAGMENT} }
       }
-    }
-  `,
+    }`,
     { cartId, lines: [{ id: lineId, quantity }] }
   );
-  return data.cartLinesUpdate.cart;
+  return data.cartLinesUpdate?.cart ?? null;
 }

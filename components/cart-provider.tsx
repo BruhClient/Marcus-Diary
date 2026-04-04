@@ -45,6 +45,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         }
       }
       const fresh = await createCart();
+      if (!fresh) return;
       localStorage.setItem("shopify_cart_id", fresh.id);
       setCart(fresh);
     }

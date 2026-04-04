@@ -19,7 +19,7 @@ export default async function GalleryPage() {
       {galleryItems.length > 0 ? (
         <Masonry items={galleryItems} columns={4} />
       ) : (
-        <p className="text-muted-foreground text-center py-20">No artworks yet.</p>
+        <p className="text-muted-foreground text-center py-20">Failed to fetch artworks.</p>
       )}
     </main>
   );
