@@ -8,84 +8,93 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import {
-  createCart,
-  getCart,
-  addToCart,
-  removeFromCart,
-  updateCartLine,
-  type Cart,
-} from "@/lib/shopify";
+
+const CART_KEY = "marcus_cart";
+
+export type CartItem = {
+  id: string;
+  title: string;
+  price: number;
+  image?: string;
+  quantity: number;
+  isOriginal: boolean; // artworks are one-of-a-kind, qty capped at 1
+};
 
 type CartContext = {
-  cart: Cart | null;
+  items: CartItem[];
   cartOpen: boolean;
   setCartOpen: (open: boolean) => void;
-  addItem: (variantId: string, quantity?: number) => Promise<void>;
-  removeItem: (lineId: string) => Promise<void>;
-  updateItem: (lineId: string, quantity: number) => Promise<void>;
+  addItem: (item: Omit<CartItem, "quantity">) => void;
+  removeItem: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
+  clearCart: () => void;
+  total: number;
   itemCount: number;
 };
 
 const CartCtx = createContext<CartContext | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<Cart | null>(null);
+  const [items, setItems] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
 
-  // Restore or create cart on mount
+  // Hydrate from localStorage after mount to avoid SSR mismatch
   useEffect(() => {
-    async function init() {
-      const storedId = localStorage.getItem("shopify_cart_id");
-      if (storedId) {
-        const existing = await getCart(storedId);
-        if (existing) {
-          setCart(existing);
-          return;
-        }
-      }
-      const fresh = await createCart();
-      if (!fresh) return;
-      localStorage.setItem("shopify_cart_id", fresh.id);
-      setCart(fresh);
+    try {
+      const stored = localStorage.getItem(CART_KEY);
+      if (stored) setItems(JSON.parse(stored) as CartItem[]);
+    } catch {
+      // ignore malformed data
     }
-    init();
   }, []);
 
-  const addItem = useCallback(
-    async (variantId: string, quantity = 1) => {
-      if (!cart) return;
-      const updated = await addToCart(cart.id, variantId, quantity);
-      setCart(updated);
-      setCartOpen(true);
-    },
-    [cart]
-  );
+  useEffect(() => {
+    localStorage.setItem(CART_KEY, JSON.stringify(items));
+  }, [items]);
 
-  const removeItem = useCallback(
-    async (lineId: string) => {
-      if (!cart) return;
-      const updated = await removeFromCart(cart.id, lineId);
-      setCart(updated);
-    },
-    [cart]
-  );
+  const addItem = useCallback((item: Omit<CartItem, "quantity">) => {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.id === item.id);
+      if (existing) {
+        if (item.isOriginal) return prev; // originals can't have qty > 1
+        return prev.map((i) =>
+          i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+        );
+      }
+      return [...prev, { ...item, quantity: 1 }];
+    });
+    setCartOpen(true);
+  }, []);
 
-  const updateItem = useCallback(
-    async (lineId: string, quantity: number) => {
-      if (!cart) return;
-      const updated = await updateCartLine(cart.id, lineId, quantity);
-      setCart(updated);
-    },
-    [cart]
-  );
+  const removeItem = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }, []);
 
-  const itemCount =
-    cart?.lines.edges.reduce((sum, { node }) => sum + node.quantity, 0) ?? 0;
+  const updateQuantity = useCallback((id: string, quantity: number) => {
+    if (quantity < 1) return;
+    setItems((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, quantity } : i))
+    );
+  }, []);
+
+  const clearCart = useCallback(() => setItems([]), []);
+
+  const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+  const itemCount = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return (
     <CartCtx.Provider
-      value={{ cart, cartOpen, setCartOpen, addItem, removeItem, updateItem, itemCount }}
+      value={{
+        items,
+        cartOpen,
+        setCartOpen,
+        addItem,
+        removeItem,
+        updateQuantity,
+        clearCart,
+        total,
+        itemCount,
+      }}
     >
       {children}
     </CartCtx.Provider>
